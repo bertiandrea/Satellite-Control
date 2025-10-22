@@ -15,6 +15,8 @@ print(f"Trovati {num_records} records, {num_envs} ambienti")
 # === Stack dei tensori nel tempo ===
 steps = [entry["step"] for entry in data]
 quat_all   = torch.stack([entry["quat"] for entry in data])      # (T, N, 4)
+quat_diff_all = torch.stack([entry["quat_diff"] for entry in data])  # (T, N, 4)
+quat_diff_rad_all = torch.stack([entry["quat_diff_rad"] for entry in data])  # (T, N)
 angvel_all = torch.stack([entry["angvel"] for entry in data])    # (T, N, 3)
 angacc_all = torch.stack([entry["angacc"] for entry in data])    # (T, N, 3)
 actions_all = torch.stack([entry["actions"] for entry in data])  # (T, N, 3)
@@ -53,6 +55,8 @@ def plot_component(title, data_all, labels):
 
 # === Plot ===
 plot_component("Quaternion", quat_all, ["x", "y", "z", "w"])
+plot_component("Quaternion difference", quat_diff_all, ["x", "y", "z", "w"])
+plot_component("Quaternion difference (rad)", quat_diff_rad_all.unsqueeze(-1), ["angle (rad)"])
 plot_component("Angular velocity", angvel_all, ["x", "y", "z"])
 plot_component("Angular acceleration", angacc_all, ["x", "y", "z"])
 plot_component("Actions", actions_all, ["x", "y", "z"])

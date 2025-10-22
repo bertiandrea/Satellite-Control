@@ -412,6 +412,8 @@ class Satellite(VecTask):
             self.log_buffer.append({
                 "step": int(self.control_steps),
                 "quat": self.satellite_quats.detach().cpu(),
+                "quat_diff": quat_diff(self.satellite_quats, self.goal_quat).detach().cpu(),
+                "quat_diff_rad": quat_diff_rad(self.satellite_quats, self.goal_quat).detach().cpu(),
                 "angvel": self.satellite_angvels.detach().cpu(),
                 "angacc": self.satellite_angacc.detach().cpu(),
                 "actions": self.actions.detach().cpu(),
