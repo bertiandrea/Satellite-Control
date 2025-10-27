@@ -7,13 +7,6 @@ import isaacgym #BugFix
 import torch
 from isaacgym import gymtorch, gymapi
 
-def set_value_by_path(target, path, value):
-    pre, _ , post = path.partition('.')
-    if post:
-        set_value_by_path(target[pre], post, value)
-    else:
-        target[path] = value
-        
 def get_property_setter_map(gym):
     property_to_setters = {
         "dof_properties": gym.set_actor_dof_properties,
@@ -159,37 +152,3 @@ def apply_random_samples(prop, og_prop, attr, attr_randomization_params, curr_gy
                 new_prop_val = get_bucketed_val(new_prop_val, bucketing_randomization_params)
         
         setattr(prop, attr, new_prop_val)
-
-def modify_adr_param(param, direction, adr_param_dict, param_limit=None):
-    op = adr_param_dict["delta_style"]
-    delta = adr_param_dict["delta"]
-    if direction == 'up':
-        if op == "additive":
-            new_val = param + delta
-        elif op == "multiplicative":
-            assert delta > 1.0, "Must have delta > 1 for multiplicative ADR update."
-            new_val = param * delta
-        else:
-            raise NotImplementedError
-        
-        if param_limit is not None:
-            new_val = min(new_val, param_limit)
-        changed = abs(new_val - param) > 1e-9
-        return new_val, changed
-    
-    elif direction == 'down':
-        if op == "additive":
-            new_val = param - delta
-        elif op == "multiplicative":
-            assert delta > 1.0, "Must have delta > 1 for multiplicative ADR update."
-            new_val = param / delta
-        else:
-            raise NotImplementedError
-        
-        if param_limit is not None:
-            new_val = max(new_val, param_limit)
-        changed = abs(new_val - param) > 1e-9
-        return new_val, changed
-    
-    else:
-        raise NotImplementedError

@@ -69,8 +69,7 @@ class Satellite(VecTask):
         if self.randomize:
             print("Applying randomizations...")
             ids = torch.arange(self.num_envs, device=self.device, dtype=torch.int)
-            adr_objective = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
-            self.apply_randomizations(ids, self.dr_params, adr_objective)
+            self.apply_randomizations(ids, self.dr_params)
         ###################################################
 
     def create_envs(self, spacing, num_per_row: int) -> None:
@@ -170,7 +169,7 @@ class Satellite(VecTask):
 
         ###################################################
         if self.randomize:
-            self.apply_randomizations(ids, self.dr_params, self.rew_buf)
+            self.apply_randomizations(ids, self.dr_params)
         ###################################################
 
     
