@@ -131,5 +131,55 @@ CONFIG = {
         "lambda_temporal_smoothness": 0.1,  # λ_t
         "lambda_spatial_smoothness": 0.1,   # λ_s
         "noise_std": 0.5,                   # σ
+    },
+    # --- dr_randomization -------------------------------------------------
+    "dr_randomization": {
+        "enabled": False,
+        "automatic": False,
+        "dr_params": {
+            "observations": {
+                "range": [-0.1, 0.1],
+                "operation": "additive",
+                "distribution": "gaussian"
+            },
+            "actions": {
+                "range": [-0.1, 0.1],
+                "operation": "additive",
+                "distribution": "gaussian"
+            },
+            "sim_params": { 
+            },
+            "actor_params": {
+                "satellite": {
+                    "color": True,
+                    "rigid_body_properties": {
+                        "inertia": {
+                            "distribution": "uniform",
+                            "operation": "scaling",
+                            "range": [0.99, 1.01],
+                            "schedule": "linear",
+                            "schedule_steps": 1,
+                        },
+                    }
+                }
+            }
+        },
+        "adr" : {
+            "worker_adr_boundary_fraction": 0.4,
+
+            "adr_queue_threshold_length": NUM_ENVS // 4,  # Number of samples to accumulate before adjusting the range
+
+            "adr_objective_threshold_low": 3.0,
+            "adr_objective_threshold_high": 5.0,
+
+            "adr_rollout_perf_alpha": 0.99,
+            "adr_param": {
+                "range_path": 'actor_params.satellite.rigid_body_properties.inertia.range',
+                "init_range": [0.99, 1.01],
+                "limits": [0.9, 1.1],
+                "delta": 1.01,
+                "delta_style": 'multiplicative',
+            }
+        }
     }
 }

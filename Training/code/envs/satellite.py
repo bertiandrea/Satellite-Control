@@ -65,6 +65,13 @@ class Satellite(VecTask):
     def create_sim(self) -> None:
         self.sim = super().create_sim(self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params) # Acquires the sim pointer
         self.create_envs(self.env_spacing, int(np.sqrt(self.num_envs)))
+        ###################################################
+        if self.randomize:
+            print("Applying randomizations...")
+            ids = torch.arange(self.num_envs, device=self.device, dtype=torch.int)
+            adr_objective = torch.zeros(self.num_envs, dtype=torch.float, device=self.device)
+            self.apply_randomizations(ids, self.dr_params, adr_objective)
+        ###################################################
 
     def create_envs(self, spacing, num_per_row: int) -> None:
         self.asset = self.load_asset()
@@ -160,6 +167,12 @@ class Satellite(VecTask):
         self.timeout_buf[ids] = False
 
         self.rew_buf[ids] = 0.0
+
+        ###################################################
+        if self.randomize:
+            self.apply_randomizations(ids, self.dr_params, self.rew_buf)
+        ###################################################
+
     
     ################################################################################################################################
                 
