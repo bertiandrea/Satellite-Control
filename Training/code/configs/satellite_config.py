@@ -9,12 +9,12 @@ import torch
 from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
 
-NUM_ENVS = 4096
+NUM_ENVS = 16
 TIMESTEPS = 120000
 HEADLESS = False
 PROFILE = False
 DEBUG_ARROWS = True
-DEBUG_PRINTS = False
+DEBUG_PRINTS = True
 
 ROLLOUTS = 16
 LEARNING_EPOCHS = 8
@@ -132,31 +132,30 @@ CONFIG = {
         "lambda_spatial_smoothness": 0.1,   # λ_s
         "noise_std": 0.5,                   # σ
     },
+
     # --- dr_randomization -------------------------------------------------
     "dr_randomization": {
-        "enabled": False,
+        "enabled": True,
         "dr_params": {
             "observations": {
-                "range": [-0.1, 0.1],
-                "operation": "additive",
-                "distribution": "gaussian"
+                "distribution": "uniform", # "uniform" or "gaussian"
+                "operation": "scaling", # "scaling" or "addition"
+                "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
             },
             "actions": {
-                "range": [-0.1, 0.1],
-                "operation": "additive",
-                "distribution": "gaussian"
+                "distribution": "uniform", # "uniform" or "gaussian"
+                "operation": "scaling", # "scaling" or "addition"
+                "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
             },
             "actor_params": {
                 "satellite": {
                     "color": True,
                     "rigid_body_properties": {
                         "inertia": {
-                            "distribution": "uniform",
-                            "operation": "scaling",
-                            "range": [0.99, 1.01],
-                            "schedule": "linear",
-                            "schedule_steps": 1,
-                        },
+                            "distribution": "uniform", # "uniform" or "gaussian"
+                            "operation": "scaling", # "scaling" or "addition"
+                            "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
+                        }
                     }
                 }
             }

@@ -7,6 +7,7 @@ from isaacgym import gymtorch, gymapi
 import os
 import time
 import sys
+import random
 import numpy as np
 from datetime import datetime
 from os.path import join
@@ -157,7 +158,7 @@ class VecTask(Env):
             (self.num_envs, self.num_states), device=self.device, dtype=torch.float)
         self.rew_buf = torch.zeros(
             self.num_envs, device=self.device, dtype=torch.float)
-        self.reset_buf = torch.ones(
+        self.reset_buf = torch.zeros(
             self.num_envs, device=self.device, dtype=torch.bool)
         self.timeout_buf = torch.zeros(
              self.num_envs, device=self.device, dtype=torch.bool)
@@ -332,12 +333,6 @@ class VecTask(Env):
 
         return sim_params
 
-
-import operator, random
-from copy import deepcopy
-from collections import deque
-from code.utils.dr_utils import get_property_setter_map, get_property_getter_map, get_default_setter_args, apply_random_samples
-
 class DRVecTask(VecTask):
     def __init__(self, config, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
         ###################################################
@@ -348,149 +343,95 @@ class DRVecTask(VecTask):
             self.first_randomization = True
             self.original_props = {}
             self.dr_randomizations = {}
-            self.last_step = -1
 
         super().__init__(config, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render)
 
-    def _randomize_non_physical_params(self, dr_params):
-        for nonphysical_param in ["observations", "actions"]:
-            if nonphysical_param in dr_params:
-                dist = dr_params[nonphysical_param]["distribution"]
-                op_type = dr_params[nonphysical_param]["operation"]
-                sched_type = dr_params[nonphysical_param]["schedule"] if "schedule" in dr_params[nonphysical_param] else None
-                sched_step = dr_params[nonphysical_param]["schedule_steps"] if "schedule" in dr_params[nonphysical_param] else None
-                if op_type == 'additive': op = operator.add
-                else: op = operator.mul
-                ####################################################################
-                if sched_type == 'linear':
-                    sched_scaling = 1.0 / sched_step * min(self.last_step, sched_step)
-                elif sched_type == 'constant':
-                    sched_scaling = 0 if self.last_step < sched_step else 1
+    def _sample_random_val(self, params):
+        if params["distribution"] == "gaussian":
+            mu, var = params["range"]
+            sample = np.random.normal(mu, var)
+        elif params["distribution"] == "uniform":
+            lo, hi = params["range"]
+            sample = np.random.uniform(lo, hi)
+        else:
+            raise ValueError(f"Unsupported distribution type")
+        return sample
+
+    def _apply_randomization(self, rb_prop, og_attr_val, attr_name, attr_params):
+        if isinstance(og_attr_val, gymapi.Mat33):
+            rx, ry, rz = og_attr_val.x, og_attr_val.y, og_attr_val.z
+            new_val = gymapi.Mat33()
+            if attr_params["operation"] == "scaling":
+                factor = self._sample_random_val(attr_params)
+                new_val.x.x, new_val.x.y, new_val.x.z = rx.x * factor, rx.y * factor, rx.z * factor
+                new_val.y.x, new_val.y.y, new_val.y.z = ry.x * factor, ry.y * factor, ry.z * factor
+                new_val.z.x, new_val.z.y, new_val.z.z = rz.x * factor, rz.y * factor, rz.z * factor
+            elif attr_params["operation"] == "addition":
+                delta = self._sample_random_val(attr_params)
+                new_val.x.x, new_val.x.y, new_val.x.z = rx.x + delta, rx.y + delta, rx.z + delta
+                new_val.y.x, new_val.y.y, new_val.y.z = ry.x + delta, ry.y + delta, ry.z + delta
+                new_val.z.x, new_val.z.y, new_val.z.z = rz.x + delta, rz.y + delta, rz.z + delta
+            else:
+                raise ValueError(f"Unsupported operation type")
+        else:
+            raise ValueError(f"Unsupported attribute type for randomization")
+        setattr(rb_prop, attr_name, new_val)
+
+    def _init_randomization_functions(self, dr_params):
+        for param in ["observations", "actions"]:
+            dist = dr_params[param]["distribution"]
+            operation = dr_params[param]["operation"]
+            if dist == 'gaussian':
+                mu, var = dr_params[param]["range"]
+                if operation == "scaling":
+                    def noise_lambda(tensor, param_name=param):
+                        return tensor * (torch.randn_like(tensor) * var + mu)
+                elif operation == "addition":
+                    def noise_lambda(tensor, param_name=param):
+                        return tensor + (torch.randn_like(tensor) * var + mu)
                 else:
-                    sched_scaling = 1
-                ####################################################################
-                if dist == 'gaussian':
-                    mu, var = dr_params[nonphysical_param]["range"]
-                    mu_corr, var_corr = dr_params[nonphysical_param].get("range_correlated", [0., 0.])
+                    raise ValueError(f"Unsupported operation type")
+            elif dist == 'uniform':
+                lo, hi = dr_params[param]["range"]
+                if operation == "scaling":
+                    def noise_lambda(tensor):
+                        return tensor * (torch.rand_like(tensor) * (hi - lo) + lo)
+                elif operation == "addition":
+                    def noise_lambda(tensor):
+                        return tensor + (torch.rand_like(tensor) * (hi - lo) + lo)
+                else:
+                    raise ValueError(f"Unsupported operation type")
+            else:
+                raise ValueError(f"Unsupported distribution type")
+            ####################################################################
+            self.dr_randomizations[param] = { 'noise_lambda': noise_lambda }
+
+    def _randomize_actor_properties(self, env_ids, dr_params):
+        for env_id in env_ids:
+            for actor_name, actor_config  in dr_params["actor_params"].items():
+                actor_handle = self.gym.find_actor_handle(self.envs[env_id], actor_name)
+                if "color" in actor_config and actor_config ["color"]:
+                    num_bodies = self.gym.get_actor_rigid_body_count(self.envs[env_id], actor_handle)
+                    for body_index in range(num_bodies):
+                        self.gym.set_rigid_body_color(self.envs[env_id], actor_handle, body_index, gymapi.MESH_VISUAL, gymapi.Vec3(random.uniform(0, 1), random.uniform(0, 1), random.uniform(0, 1)))
+                if "rigid_body_properties" in actor_config:
+                    rb_props = self.gym.get_actor_rigid_body_properties(self.envs[env_id], actor_handle)
                     ####################################################################
-                    if op_type == 'additive':
-                        mu *= sched_scaling
-                        var *= sched_scaling
-                        mu_corr *= sched_scaling
-                        var_corr *= sched_scaling
-                    elif op_type == 'scaling':
-                        var = var * sched_scaling
-                        mu = mu * sched_scaling + 1.0 * (1.0 - sched_scaling)
-                        var_corr = var_corr * sched_scaling
-                        mu_corr = mu_corr * sched_scaling + 1.0 * (1.0 - sched_scaling)
+                    if self.first_randomization:
+                        self.original_props[actor_name] = [rb.inertia for rb in rb_props]
                     ####################################################################
-                    def noise_lambda(tensor, param_name=nonphysical_param):
-                        params = self.dr_randomizations[param_name]
-                        corr = params.get('corr', None)
-                        if corr is None:
-                            corr = torch.randn_like(tensor)
-                            params['corr'] = corr
-                        corr = corr * params['var_corr'] + params['mu_corr']
-                        return op(tensor, corr + torch.randn_like(tensor) * params['var'] + params['mu'])
-                    ####################################################################
-                    self.dr_randomizations[nonphysical_param] = {
-                        'mu': mu, 'var': var, 'mu_corr': mu_corr, 'var_corr': var_corr, 'noise_lambda': noise_lambda}
-                    ####################################################################
-                elif dist == 'uniform':
-                    lo, hi = dr_params[nonphysical_param]["range"]
-                    lo_corr, hi_corr = dr_params[nonphysical_param].get("range_correlated", [0., 0.])
-                    ####################################################################
-                    if op_type == 'additive':
-                        lo *= sched_scaling
-                        hi *= sched_scaling
-                        lo_corr *= sched_scaling
-                        hi_corr *= sched_scaling
-                    elif op_type == 'scaling':
-                        lo = lo * sched_scaling + 1.0 * (1.0 - sched_scaling)
-                        hi = hi * sched_scaling + 1.0 * (1.0 - sched_scaling)
-                        lo_corr = lo_corr * sched_scaling + 1.0 * (1.0 - sched_scaling)
-                        hi_corr = hi_corr * sched_scaling + 1.0 * (1.0 - sched_scaling)
-                    ####################################################################
-                    def noise_lambda(tensor, param_name=nonphysical_param):
-                        params = self.dr_randomizations[param_name]
-                        corr = params.get('corr', None)
-                        if corr is None:
-                            corr = torch.randn_like(tensor)
-                            params['corr'] = corr
-                        corr = corr * (params['hi_corr'] - params['lo_corr']) + params['lo_corr']
-                        return op(tensor, corr + torch.rand_like(tensor) * (params['hi'] - params['lo']) + params['lo'])
-                    ####################################################################
-                    self.dr_randomizations[nonphysical_param] = {
-                        'lo': lo, 'hi': hi, 'lo_corr': lo_corr, 'hi_corr': hi_corr, 'noise_lambda': noise_lambda}
-                    ####################################################################
-    
-    def _randomize_actor_properties(self, dr_params, env_ids, param_maps):
-        for i_, env_id in enumerate(env_ids):
-            for actor, actor_properties in dr_params["actor_params"].items():
-                for prop_name, prop_attrs in actor_properties.items():
-                    ####################################################################
-                    if prop_name == 'color':
-                        num_bodies = self.gym.get_actor_rigid_body_count(self.envs[env_id], self.gym.find_actor_handle(self.envs[env_id], actor))
-                        for n in range(num_bodies):
-                            self.gym.set_rigid_body_color(self.envs[env_id], self.gym.find_actor_handle(self.envs[env_id], actor), n, gymapi.MESH_VISUAL, gymapi.Vec3(random.uniform(0, 1), random.uniform(0, 1), random.uniform(0, 1)))
-                        continue
-                    ####################################################################
-                    prop = param_maps["getters"][prop_name](self.envs[env_id], self.gym.find_actor_handle(self.envs[env_id], actor))
-                    set_random_properties = True
-                    ####################################################################
-                    if isinstance(prop, list):
-                        if self.first_randomization:
-                            self.original_props[prop_name] = [{attr: getattr(p, attr) for attr in dir(p)} for p in prop]
-                        ####################################################################
-                        for attr, attr_randomization_params in prop_attrs.items():
-                            for idx, (p, og_p) in enumerate(zip(prop, self.original_props[prop_name])):
-                                ####################################################################
-                                setup_only = attr_randomization_params.get('setup_only', False)
-                                if (setup_only and not self.sim_initialized) or not setup_only:
-                                    ############################### ADR ################################
-                                    original_randomization_params = dr_params['actor_params'][actor][prop_name][attr]
-                                    ####################################################################
-                                    apply_random_samples(p, og_p, attr, attr_randomization_params, self.last_step, None, bucketing_randomization_params=original_randomization_params)
-                                else:
-                                    set_random_properties = False
-                    ####################################################################
-                    else:
-                        if self.first_randomization:
-                            self.original_props[prop_name] = deepcopy(prop)
-                        ####################################################################
-                        for attr, attr_randomization_params in prop_attrs.items():
-                            p, og_p = prop, self.original_props[prop_name]
-                            ####################################################################
-                            setup_only = attr_randomization_params.get('setup_only', False)
-                            if (setup_only and not self.sim_initialized) or not setup_only:
-                                ############################### ADR ################################
-                                original_randomization_params = dr_params['actor_params'][actor][prop_name][attr]
-                                ####################################################################
-                                apply_random_samples(p, og_p, attr, attr_randomization_params, self.last_step, None, bucketing_randomization_params=original_randomization_params)
-                            else:
-                                set_random_properties = False
-                    ####################################################################
-                    if set_random_properties:
-                        setter = param_maps["setters"][prop_name]
-                        default_args = param_maps["defaults"][prop_name]
-                        setter(self.envs[env_id], self.gym.find_actor_handle(self.envs[env_id], actor), prop, *default_args)
+                    for i, rb_prop in enumerate(rb_props):
+                        if "inertia" in actor_config["rigid_body_properties"]:
+                            self._apply_randomization(rb_prop, self.original_props[actor_name][i], "inertia", actor_config["rigid_body_properties"]["inertia"])
+                    self.gym.set_actor_rigid_body_properties(
+                        self.envs[env_id], actor_handle, rb_props, recomputeInertia=True
+                    )
                     
     def apply_randomizations(self, env_ids, dr_params):
-        self.last_step = self.gym.get_frame_count(self.sim)
-
         if self.first_randomization:
-            self._randomize_non_physical_params(dr_params)
+            self._init_randomization_functions(dr_params)
 
-        if self.debug_prints:
-            print(f"Current DR params: {dr_params}")
-        
-        param_maps = {
-            "getters": get_property_getter_map(self.gym),
-            "setters": get_property_setter_map(self.gym),
-            "defaults": get_default_setter_args(self.gym),
-        }
-        
-        self._randomize_actor_properties(dr_params, env_ids, param_maps)
+        self._randomize_actor_properties(env_ids, dr_params)
 
         self.first_randomization = False
 
