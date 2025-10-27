@@ -1,7 +1,7 @@
 # satellite.py
 
 from code.utils.satellite_util import sample_random_quaternion_batch, quat_diff, quat_diff_rad, quat_axis
-from code.envs.vec_task import VecTask
+from code.envs.vec_task import DRVecTask
 from code.rewards.satellite_reward import (
     SimpleReward,
     RewardFunction
