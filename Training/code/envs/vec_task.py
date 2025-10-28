@@ -16,7 +16,6 @@ from abc import ABC
 from gym import spaces
 
 from torch.profiler import record_function
-from torch.utils.tensorboard import SummaryWriter
 
 EXISTING_SIM = None
 SCREEN_CAPTURE_RESOLUTION = (1027, 768)
@@ -81,8 +80,6 @@ class Env(ABC):
 
         self.record_frames: bool = False
         self.record_frames_dir = join("recorded_frames", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-
-        self.writer = SummaryWriter(comment="_satellite")
 
 class VecTask(Env):
 
