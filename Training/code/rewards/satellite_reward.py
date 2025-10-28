@@ -135,6 +135,9 @@ class ReductionReward(RewardFunction):
 
         self.prev_phi = phi.clone()
 
+        self._log_scalar("Reward_policy/actions[0, 0]", actions[0, 0])
+        self._log_scalar("Reward_policy/action[0, 1]", actions[0, 1])
+        self._log_scalar("Reward_policy/action[0, 2]", actions[0, 2])
         self._log_scalar("Reward_policy/phi", phi.mean().item() * (180 / torch.pi))
         self._log_scalar("Reward_policy/omega_err", omega_err.mean().item())
         self._log_scalar("Reward_policy/in_goal", in_goal.float().mean().item())   
