@@ -234,3 +234,13 @@ class Satellite(VecTask):
 
         if self.debug_arrows:
             self.draw_arrows()
+    
+    def close(self):
+        print("Closing Satellite environment...")
+        del self.sat_glob_pos
+        del self.prev_angvel, self.goal_ang_vel, self.goal_ang_acc, self.torque_tensor, self.force_tensor, self.root_indices
+        del self.root_states, self.satellite_pos, self.satellite_quats, self.satellite_linvels, self.satellite_angvels
+        del self.actions, self.reset_ids
+        del self.satellite_angacc
+        torch.cuda.empty_cache()  # Empty GPU cache
+        super().close()

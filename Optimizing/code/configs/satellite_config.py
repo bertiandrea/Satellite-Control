@@ -10,7 +10,8 @@ from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
 
 NUM_ENVS = 4096
-TIMESTEPS = 120000
+N_EPOCHS = 8
+TIMESTEPS = 120
 HEADLESS = True
 DEBUG_ARROWS = False
 
@@ -74,9 +75,6 @@ CONFIG = {
     "rl": {
         "PPO": {
             "num_envs": NUM_ENVS,
-            "rollouts": ROLLOUTS,
-            "learning_epochs": LEARNING_EPOCHS,
-            "mini_batches": MINI_BATCHES,
             
             "learning_rate_scheduler" : KLAdaptiveRL,
             "learning_rate_scheduler_kwargs" : {"kl_threshold": 0.01},
@@ -97,6 +95,7 @@ CONFIG = {
             },
         },
         "trainer": {
+            "n_epochs": N_EPOCHS,
             "timesteps": TIMESTEPS,
             "disable_progressbar": False,
             "headless": HEADLESS,

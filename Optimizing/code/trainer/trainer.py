@@ -53,52 +53,6 @@ class Trainer:
 
         self.agent.init(trainer_cfg=self.cfg)
 
-    def train(self) -> None:
-        self.agent.set_running_mode("train")
-
-        states, infos = self.env.reset()
-
-        for timestep in tqdm.tqdm(
-            range(self.initial_timestep, self.timesteps), disable=self.disable_progressbar, file=sys.stdout
-        ):
-            self.agent.pre_interaction(timestep=timestep, timesteps=self.timesteps)
-
-            with torch.no_grad():
-                actions = self.agent.act(states, timestep=timestep, timesteps=self.timesteps)[0]
-
-                next_states, rewards, terminated, truncated, infos = self.env.step(actions)
-
-                if not self.headless:
-                    self.env.render()
-
-                self.agent.record_transition(
-                    states=states,
-                    actions=actions,
-                    rewards=rewards,
-                    next_states=next_states,
-                    terminated=terminated,
-                    truncated=truncated,
-                    infos=infos,
-                    timestep=timestep,
-                    timesteps=self.timesteps,
-                )
-
-                if self.environment_info in infos:
-                    for k, v in infos[self.environment_info].items():
-                        if isinstance(v, torch.Tensor) and v.numel() == 1:
-                            self.agent.track_data(f"Info / {k}", v.item())
-
-            self.agent.post_interaction(timestep=timestep, timesteps=self.timesteps)
-
-            if self.env.num_envs > 1:
-                states = next_states
-            else:
-                if terminated.any() or truncated.any():
-                    with torch.no_grad():
-                        states, infos = self.env.reset()
-                else:
-                    states = next_states
-
     def init_step_train(self) -> None:
         self.agent.set_running_mode("train")
 
@@ -147,51 +101,4 @@ class Trainer:
         
         return states, infos, rewards
     
-
-    def eval(self) -> None:
-        self.agent.set_running_mode("eval")
-
-        states, infos = self.env.reset()
-
-        for timestep in tqdm.tqdm(
-            range(self.initial_timestep, self.timesteps), disable=self.disable_progressbar, file=sys.stdout
-        ):
-            self.agent.pre_interaction(timestep=timestep, timesteps=self.timesteps)
-
-            with torch.no_grad():
-                outputs = self.agent.act(states, timestep=timestep, timesteps=self.timesteps)
-                actions = outputs[0] if self.stochastic_evaluation else outputs[-1].get("mean_actions", outputs[0])
-
-                next_states, rewards, terminated, truncated, infos = self.env.step(actions)
-
-                if not self.headless:
-                    self.env.render()
-
-                self.agent.record_transition(
-                    states=states,
-                    actions=actions,
-                    rewards=rewards,
-                    next_states=next_states,
-                    terminated=terminated,
-                    truncated=truncated,
-                    infos=infos,
-                    timestep=timestep,
-                    timesteps=self.timesteps,
-                )
-
-                if self.environment_info in infos:
-                    for k, v in infos[self.environment_info].items():
-                        if isinstance(v, torch.Tensor) and v.numel() == 1:
-                            self.agent.track_data(f"Info / {k}", v.item())
-
-            super(type(self.agent), self.agent).post_interaction(timestep=timestep, timesteps=self.timesteps)
-
-            if self.env.num_envs > 1:
-                states = next_states
-            else:
-                if terminated.any() or truncated.any():
-                    with torch.no_grad():
-                        states, infos = self.env.reset()
-                else:
-                    states = next_states
 

@@ -166,9 +166,9 @@ class VecTask(Env):
         self.extras = {}
 
     def create_sim(self, compute_device: int, graphics_device: int, physics_engine, sim_params: gymapi.SimParams):
-        #sim = _create_sim_once(self.gym, compute_device, graphics_device, physics_engine, sim_params)
+        sim = _create_sim_once(self.gym, compute_device, graphics_device, physics_engine, sim_params)
         # WORKAROUND: BugFix for IsaacGym not handling multiple Gym instances correctly in the same process (Needed for Hyperparameter Optimization)
-        sim = self.gym.create_sim(compute_device, graphics_device, physics_engine, sim_params)
+        # sim = self.gym.create_sim(compute_device, graphics_device, physics_engine, sim_params)
         if sim is None:
             print("*** Failed to create sim")
             quit()
@@ -315,3 +315,26 @@ class VecTask(Env):
                     setattr(sim_params.flex, opt, config_sim["flex"][opt])
 
         return sim_params
+
+    def close(self):
+        print("Closing VecTask environment...")
+        for env in self.envs:
+            self.gym.destroy_env(env)
+        
+        print(f"Destroyed environments: {len(self.envs)}")
+        
+        if self.viewer is not None:
+            self.gym.destroy_viewer(self.viewer)
+            print("Destroyed viewer")
+            self.viewer = None
+
+        self.gym.destroy_sim(self.sim)
+        self.sim = None
+        print("Destroyed simulation")
+
+        del self.states_buf, self.obs_buf, self.rew_buf, self.reset_buf, self.progress_buf, self.timeout_buf
+        torch.cuda.empty_cache()  # Empty GPU cache
+
+        global EXISTING_SIM
+        EXISTING_SIM = None
+
