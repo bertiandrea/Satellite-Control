@@ -51,7 +51,7 @@ CONFIG = {
         "torque_scale": 100.0,
         "debug_arrows": DEBUG_ARROWS,
         "debug_prints": False,
-        "discretize_starting_pos": False,
+        "discretize_starting_pos": True,
         "log_trajectories": LOG_TRAJECTORIES,
 
         "asset": {
