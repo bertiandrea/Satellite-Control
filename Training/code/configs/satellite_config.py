@@ -10,7 +10,7 @@ from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
 
 NUM_ENVS = 4096
-TIMESTEPS = 120000
+TIMESTEPS = 28800
 HEADLESS = False
 PROFILE = False
 DEBUG_ARROWS = True
@@ -18,7 +18,7 @@ DEBUG_PRINTS = False
 
 ROLLOUTS = 16
 LEARNING_EPOCHS = 8
-MINI_BATCHES = 2
+MINI_BATCHES = 4
 
 CONFIG = {
     # --- seed & devices ----------------------------------------------------
@@ -45,10 +45,10 @@ CONFIG = {
         "clipActions": 1.0,
         "clipObservations": 10.0,
 
-        "max_episode_length": 1000.0,
+        "max_episode_length": 480.0,
 
         "envSpacing": 3.0,
-        "torque_scale": 200.0,
+        "torque_scale": 100.0,
         "debug_arrows": DEBUG_ARROWS,
         "debug_prints": DEBUG_PRINTS,
                 
@@ -81,10 +81,10 @@ CONFIG = {
             "mini_batches": MINI_BATCHES,
             
             "learning_rate_scheduler" : KLAdaptiveRL,
-            "learning_rate_scheduler_kwargs" : {"kl_threshold": 0.01},
+            "learning_rate_scheduler_kwargs" : {"kl_threshold": 0.016},
             "state_preprocessor" : RunningStandardScaler,
             "value_preprocessor" : RunningStandardScaler,
-            "rewards_shaper" : None,
+            "rewards_shaper" : lambda rewards, timestep, timesteps: rewards * 0.01,
 
             "discount_factor" : 0.99, #(γ) Future reward discount; balances immediate versus long-term return.
             "learning_rate" : 1e-3, #Step size for optimizer (e.g. Adam) when updating policy and value networks.
