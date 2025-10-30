@@ -14,16 +14,16 @@ class Shared(GaussianMixin, DeterministicMixin, Model):
         DeterministicMixin.__init__(self, clip_actions)
 
         self.net = nn.Sequential(nn.Linear(self.num_observations, hidden_size),
-                                 nn.Tanh(),
+                                 nn.ELU(),
+                                 nn.Linear(hidden_size, hidden_size),
+                                 nn.ELU(),
                                  nn.Linear(hidden_size, hidden_size//2),
-                                 nn.Tanh(),
-                                 nn.Linear(hidden_size//2, hidden_size//4),
-                                 nn.Tanh())
+                                 nn.ELU())
 
-        self.mean_layer = nn.Linear(hidden_size//4, self.num_actions)
+        self.mean_layer = nn.Linear(hidden_size//2, self.num_actions)
         self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
 
-        self.value_layer = nn.Linear(hidden_size//4, 1)
+        self.value_layer = nn.Linear(hidden_size//2, 1)
 
     def act(self, inputs, role):
         if role == "policy":
