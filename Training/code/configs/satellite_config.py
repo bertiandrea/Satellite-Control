@@ -16,9 +16,9 @@ PROFILE = False
 DEBUG_ARROWS = True
 DEBUG_PRINTS = False
 
-ROLLOUTS = 16
-LEARNING_EPOCHS = 8
-MINI_BATCHES = 4
+ROLLOUTS = 32
+LEARNING_EPOCHS = 16
+MINI_BATCHES = 8
 
 CONFIG = {
     # --- seed & devices ----------------------------------------------------
