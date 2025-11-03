@@ -82,6 +82,7 @@ class Satellite(VecTask):
 
         self.prev_angvel = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
 
+        # Goal Configured ad Envs Creation Time
         self.goal_ang_vel = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
         self.goal_ang_acc = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
 
