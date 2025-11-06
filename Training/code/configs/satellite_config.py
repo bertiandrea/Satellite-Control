@@ -45,7 +45,7 @@ CONFIG = {
         "clipActions": 1.0,
         "clipObservations": 10.0,
 
-        "max_episode_length": 333.0,
+        "max_episode_length": 500.0,
 
         "envSpacing": 3.0,
         "torque_scale": 100.0,
