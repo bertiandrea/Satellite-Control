@@ -15,6 +15,8 @@ HEADLESS = False
 DEBUG_ARROWS = True
 LOG_TRAJECTORIES = True
 
+ROLLOUTS = 16
+
 CONFIG = {
     # --- seed & devices ----------------------------------------------------
     "set_seed": True,
@@ -87,6 +89,9 @@ CONFIG = {
             "disable_progressbar": False,
             "headless": HEADLESS,
             "stochastic_evaluation": False,
+        },
+        "memory": {
+            "rollouts": ROLLOUTS,
         },
     },
     # --- logging -----------------------------------------------------------
