@@ -108,7 +108,7 @@ class ReductionReward(RewardFunction):
         self.th_ang_goal = 0.1 * (math.pi / 180)
         self.th_vel_goal = 1.0 * (math.pi / 180)
         self.bonus = 9.0
-        self.lambda_u = 0.0
+        self.lambda_u = 5e-5
 
     def compute(
         self, quats, ang_vels, ang_accs, goal_quat, goal_ang_vel, goal_ang_acc, actions

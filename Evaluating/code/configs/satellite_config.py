@@ -10,14 +10,10 @@ from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
 
 NUM_ENVS = 4096
-TIMESTEPS = 28800
+TIMESTEPS = 100000
 HEADLESS = False
 DEBUG_ARROWS = True
 LOG_TRAJECTORIES = True
-
-ROLLOUTS = 32
-LEARNING_EPOCHS = 16
-MINI_BATCHES = 8
 
 CONFIG = {
     # --- seed & devices ----------------------------------------------------
@@ -45,7 +41,7 @@ CONFIG = {
         "clipActions": 1.0,
         "clipObservations": 10.0,
 
-        "max_episode_length": 480.0,
+        "max_episode_length": 333.0,
 
         "envSpacing": 3.0,
         "torque_scale": 100.0,
@@ -78,29 +74,6 @@ CONFIG = {
     "rl": {
         "PPO": {
             "num_envs": NUM_ENVS,
-            "rollouts": ROLLOUTS,
-            "learning_epochs": LEARNING_EPOCHS,
-            "mini_batches": MINI_BATCHES,
-
-            "learning_rate_scheduler" : KLAdaptiveRL,
-            "learning_rate_scheduler_kwargs" : {"kl_threshold": 0.016},
-            "state_preprocessor" : RunningStandardScaler,
-            "value_preprocessor" : RunningStandardScaler,
-            "rewards_shaper" : lambda rewards, timestep, timesteps: rewards,
-
-            "discount_factor" : 0.99, #(γ) Future reward discount; balances immediate versus long-term return.
-            "learning_rate" : 1e-3, #Step size for optimizer (e.g. Adam) when updating policy and value networks.
-            "grad_norm_clip" : 1.0, #Maximum norm value to clip gradients, preventing exploding gradients.
-            "ratio_clip" : 0.2, #(ϵ) PPO’s clipping threshold on the policy probability ratio to constrain updates.
-            "clip_predicted_values" : True, #If enabled, clips the new value predictions to lie within the range defined by value_clip around the old predictions.
-            "value_clip" : 0.2, #Clipping range for value function targets to stabilize value updates.
-            "entropy_loss_scale" : 0.00, #Coefficient multiplying the entropy bonus; encourages exploration when > 0.
-            "value_loss_scale" : 1.0, #Coefficient weighting the value function loss in the total loss.
-            "kl_threshold" : 0, #Optional early-stop threshold on KL divergence between old and new policies (0 disables).
-            "lambda" : 0.95, #(λ) GAE parameter for bias–variance trade-off in advantage estimation.
-
-            "random_timesteps" : 0, #Number of initial timesteps with random actions before learning or policy-driven sampling.
-            "learning_starts" : 0, #Number of environment steps to collect before beginning any gradient updates.
             
             "experiment": {
                 "write_interval": "auto",
@@ -114,9 +87,6 @@ CONFIG = {
             "disable_progressbar": False,
             "headless": HEADLESS,
             "stochastic_evaluation": False,
-        },
-        "memory": {
-            "rollouts": ROLLOUTS,
         },
     },
     # --- logging -----------------------------------------------------------

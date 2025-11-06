@@ -125,12 +125,14 @@ class Satellite(VecTask):
         self.actor_handles = []
         self.sat_glob_pos = torch.zeros((self.num_envs, 3), dtype=torch.float, device=self.device)
         
+        ###################################################
         if self.discretize_starting_pos:
             base_quat = sample_random_quaternion_batch(self.device, 1)
             self.goal_quat = base_quat.repeat(self.num_envs, 1)
             self.asset_init_pos_r_all = self.get_discretized_orientations(base_quat)
         else:
             self.goal_quat = sample_random_quaternion_batch(self.device, self.num_envs)
+        ###################################################
         
         for i in range(self.num_envs):
             env = self.gym.create_env(self.sim, env_lower, env_upper, num_per_row)

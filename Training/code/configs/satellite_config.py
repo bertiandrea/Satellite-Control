@@ -10,15 +10,15 @@ from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
 
 NUM_ENVS = 4096
-TIMESTEPS = 28800
+TIMESTEPS = 100000
 HEADLESS = False
 PROFILE = False
 DEBUG_ARROWS = True
 DEBUG_PRINTS = False
 
-ROLLOUTS = 32
-LEARNING_EPOCHS = 16
-MINI_BATCHES = 8
+ROLLOUTS = 16
+LEARNING_EPOCHS = 8
+MINI_BATCHES = 2
 
 CONFIG = {
     # --- seed & devices ----------------------------------------------------
@@ -45,7 +45,7 @@ CONFIG = {
         "clipActions": 1.0,
         "clipObservations": 10.0,
 
-        "max_episode_length": 480.0,
+        "max_episode_length": 333.0,
 
         "envSpacing": 3.0,
         "torque_scale": 100.0,
@@ -84,10 +84,10 @@ CONFIG = {
             "learning_rate_scheduler_kwargs" : {"kl_threshold": 0.016},
             "state_preprocessor" : RunningStandardScaler,
             "value_preprocessor" : RunningStandardScaler,
-            "rewards_shaper" : lambda rewards, timestep, timesteps: rewards,
+            "rewards_shaper" : lambda rewards, timestep, timesteps: rewards * 0.1,
 
             "discount_factor" : 0.99, #(γ) Future reward discount; balances immediate versus long-term return.
-            "learning_rate" : 1e-3, #Step size for optimizer (e.g. Adam) when updating policy and value networks.
+            "learning_rate" : 5e-4, #Step size for optimizer (e.g. Adam) when updating policy and value networks.
             "grad_norm_clip" : 1.0, #Maximum norm value to clip gradients, preventing exploding gradients.
             "ratio_clip" : 0.2, #(ϵ) PPO’s clipping threshold on the policy probability ratio to constrain updates.
             "clip_predicted_values" : True, #If enabled, clips the new value predictions to lie within the range defined by value_clip around the old predictions.
