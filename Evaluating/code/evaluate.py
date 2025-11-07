@@ -34,6 +34,12 @@ def parse_args():
         default="test",
         help="Which RewardFunction?"
     )
+    parser.add_argument(
+        "--run-name",
+        type=str,
+        default="evaluation_run",
+        help="Name of the evaluation run"
+    )
     return parser.parse_args()
 
 def main():
@@ -94,8 +100,10 @@ def main():
                 action_space=env.action_space,
                 device=env.device)
 
-    agent.load("/home/andreaberti/Satellite-Control/Evaluating/best_agent.pt")
+    agent.load("/home/andreaberti/Satellite-Control/Evaluating/" + args.run_name + ".pt")
 
+    print("Loaded agent from /home/andreaberti/Satellite-Control/Evaluating/" + args.run_name + ".pt")
+    
     trainer = SequentialTrainer(cfg=CONFIG["rl"]["trainer"], env=env, agents=agent)
 
     trainer.eval()

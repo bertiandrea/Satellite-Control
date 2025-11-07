@@ -10,7 +10,7 @@ from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
 
 NUM_ENVS = 4096
-TIMESTEPS = 100000
+MAX_EPISODE_LENGTH = 1000.0
 HEADLESS = False
 DEBUG_ARROWS = True
 LOG_TRAJECTORIES = True
@@ -45,7 +45,7 @@ CONFIG = {
         "clipActions": 1.0,
         "clipObservations": 10.0,
 
-        "max_episode_length": 500.0,
+        "max_episode_length": MAX_EPISODE_LENGTH,
 
         "envSpacing": 3.0,
         "torque_scale": 100.0,
@@ -110,7 +110,7 @@ CONFIG = {
             },
         },
         "trainer": {
-            "timesteps": TIMESTEPS,
+            "timesteps": int(MAX_EPISODE_LENGTH / ( 1.0 / 60.0 )),
             "disable_progressbar": False,
             "headless": HEADLESS,
             "stochastic_evaluation": False,

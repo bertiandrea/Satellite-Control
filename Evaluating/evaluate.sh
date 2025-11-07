@@ -2,7 +2,8 @@
 
 DISPLAY_NUM=${1:-99}            # Numero del display, default 99
 CONDA_ENV=${2:-rlgpu}           # Nome dell'ambiente Conda, default "rlgpu"
-REWARD_FN=${3:-simple}            # Reward function da passare, default "simple"
+REWARD_FN=${3:-simple}          # Reward function da passare, default "simple"
+RUN_NAME=${4:-evaluation_run}   # Nome del run di valutazione, default "evaluation_run"
 SCREEN_RES="1920x1080x24"
 
 export DISPLAY=:$DISPLAY_NUM
@@ -10,6 +11,7 @@ export DISPLAY=:$DISPLAY_NUM
 echo "Using DISPLAY=$DISPLAY"
 echo "Using Conda environment: $CONDA_ENV"
 echo "Using reward function: $REWARD_FN"
+echo "Using run name: $RUN_NAME"
 
 # Verifica se il display è già in uso
 if [ -e /tmp/.X${DISPLAY_NUM}-lock ]; then
@@ -63,6 +65,6 @@ else
     exit 1
 fi
 
-python -m code.evaluate --reward-fn "$REWARD_FN"
+python -m code.evaluate --reward-fn "$REWARD_FN" --run-name "$RUN_NAME"
 
 exit 0
