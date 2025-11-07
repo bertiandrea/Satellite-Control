@@ -10,7 +10,7 @@ from skrl.resources.preprocessors.torch import RunningStandardScaler
 from skrl.resources.schedulers.torch import KLAdaptiveRL
 
 NUM_ENVS = 4096
-MAX_EPISODE_LENGTH = 500.0
+MAX_EPISODE_LENGTH = 400.0
 N_EPISODES = 8
 HEADLESS = False
 PROFILE = False
