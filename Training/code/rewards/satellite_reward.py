@@ -138,15 +138,15 @@ class ReductionReward(RewardFunction):
         self._log_scalar("Reward_policy/actions[0, 0]", actions[0, 0])
         self._log_scalar("Reward_policy/action[0, 1]", actions[0, 1])
         self._log_scalar("Reward_policy/action[0, 2]", actions[0, 2])
+
         self._log_scalar("Reward_policy/phi", phi.mean().item() * (180 / torch.pi))
         self._log_scalar("Reward_policy/omega_err", omega_err.mean().item())
-        self._log_scalar("Reward_policy/in_goal", in_goal.float().mean().item())   
+
+        self._log_scalar("Reward_policy/in_goal", in_goal.sum().item())   
         self._log_scalar("Reward_policy/energy", u_norm_sq.mean().item())
         self._log_scalar("Reward_policy/max_torque", actions.abs().max().item())
+        self._log_scalar("Reward_policy/max_torque_mean", actions.abs().max(dim=1).mean().item())
 
-        self._log_scalar("Reward_policy/reward", reward.mean().item())
-        self._log_scalar("Reward_policy/bonus", r_bonus.mean().item())
-        self._log_scalar("Reward_policy/effort", r_effort.mean().item())
         self._log_scalar("Reward_policy/total", final_reward.mean().item())
 
         self.global_step += 1
