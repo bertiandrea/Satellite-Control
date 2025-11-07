@@ -145,7 +145,7 @@ class ReductionReward(RewardFunction):
         self._log_scalar("Reward_policy/in_goal", in_goal.sum().item())   
         self._log_scalar("Reward_policy/energy", u_norm_sq.mean().item())
         self._log_scalar("Reward_policy/max_torque", actions.abs().max().item())
-        self._log_scalar("Reward_policy/max_torque_mean", actions.abs().max(dim=1).mean().item())
+        self._log_scalar("Reward_policy/max_torque_mean", actions.abs().max(dim=1).values.mean().item())
 
         self._log_scalar("Reward_policy/total", final_reward.mean().item())
 
