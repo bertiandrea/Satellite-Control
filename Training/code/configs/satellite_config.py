@@ -57,7 +57,7 @@ CONFIG = {
             "assetRoot": str(Path(__file__).resolve().parent.parent),
             "assetFileName": "satellite.urdf",
             "assetName": "satellite",
-        },
+        }
     },
 
     # --- sim section -------------------------------------------------------
@@ -70,7 +70,7 @@ CONFIG = {
 
         "physx": {
             "use_gpu": True,
-        },
+        }
     },
 
     # --- RL / PPO hyper-params --------------------------------------------
@@ -106,7 +106,7 @@ CONFIG = {
                 "checkpoint_interval": "auto",
                 "directory": "./runs",
                 "wandb": False,
-            },
+            }
         },
 
         "trainer": {
@@ -117,7 +117,7 @@ CONFIG = {
 
         "memory": {
             "rollouts": ROLLOUTS,
-        },
+        }
     },
 
     # --- logging -----------------------------------------------------------
@@ -132,5 +132,34 @@ CONFIG = {
         "lambda_temporal_smoothness": 0.1,  # λ_t
         "lambda_spatial_smoothness": 0.1,   # λ_s
         "noise_std": 0.5,                   # σ
+    },
+
+    # --- dr_randomization -------------------------------------------------
+    "dr_randomization": {
+        "enabled": True,
+        "dr_params": {
+            "observations": {
+                "distribution": "uniform", # "uniform" or "gaussian"
+                "operation": "scaling", # "scaling" or "addition"
+                "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
+            },
+            "actions": {
+                "distribution": "uniform", # "uniform" or "gaussian"
+                "operation": "scaling", # "scaling" or "addition"
+                "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
+            },
+            "actor_params": {
+                "satellite": {
+                    "color": True,
+                    "rigid_body_properties": {
+                        "inertia": {
+                            "distribution": "uniform", # "uniform" or "gaussian"
+                            "operation": "scaling", # "scaling" or "addition"
+                            "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
+                        }
+                    }
+                }
+            }
+        }
     }
 }

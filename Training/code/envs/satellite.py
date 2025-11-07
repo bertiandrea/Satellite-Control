@@ -1,7 +1,7 @@
 # satellite.py
 
 from code.utils.satellite_util import sample_random_quaternion_batch, quat_diff, quat_diff_rad, quat_axis
-from code.envs.vec_task import VecTask
+from code.envs.vec_task import DRVecTask
 from code.rewards.satellite_reward import (
     SimpleReward,
     RewardFunction
@@ -17,7 +17,7 @@ import numpy as np
 BASE_COLORS_SAT  = torch.tensor([[1,0,1], [0,1,1], [1,1,0]], dtype=torch.float)
 BASE_COLORS_GOAL = torch.tensor([[0,0,1], [0,1,0], [1,0,0]], dtype=torch.float)
 
-class Satellite(VecTask):
+class Satellite(DRVecTask):
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render, reward_fn: RewardFunction = None):
         self.dt =                    cfg["sim"].get('dt', 1 / 60.0)                             # seconds
         self.max_episode_length =    int(cfg["env"].get('max_episode_length', 30.0) / self.dt)  # seconds
@@ -65,6 +65,13 @@ class Satellite(VecTask):
     def create_sim(self) -> None:
         self.sim = super().create_sim(self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params) # Acquires the sim pointer
         self.create_envs(self.env_spacing, int(np.sqrt(self.num_envs)))
+        ###################################################
+        if self.randomize:
+            print("Applying randomizations...")
+            ids = torch.arange(self.num_envs, device=self.device, dtype=torch.int)
+            self.apply_randomizations(ids, self.dr_params)
+        ###################################################
+
 
     def create_envs(self, spacing, num_per_row: int) -> None:
         self.asset = self.load_asset()
@@ -161,6 +168,11 @@ class Satellite(VecTask):
 
         self.rew_buf[ids] = 0.0
     
+        ###################################################
+        if self.randomize:
+            self.apply_randomizations(ids, self.dr_params)
+        ###################################################
+
     ################################################################################################################################
                 
     def termination(self) -> None:
