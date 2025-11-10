@@ -68,7 +68,7 @@ def main():
     config_to_save["model_path"] = f"/home/andreaberti/Satellite-Control/Evaluating/{args.run_name}.pt"
 
     with open(config_path, "w") as f:
-        json.dump(config_to_save, f, indent=4)
+        json.dump(config_to_save, f, indent=4, default=str)
 
     print(f"[INFO] Config di valutazione salvata in: {config_path}")
     # ──────────────────────────────────────────────────────────────────────────

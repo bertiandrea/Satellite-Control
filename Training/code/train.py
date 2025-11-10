@@ -126,7 +126,7 @@ def main():
     config_path = os.path.join(run_dir, f"config_{timestamp}.json")
 
     with open(config_path, "w") as f:
-        json.dump(CONFIG, f, indent=4)
+        json.dump(CONFIG, f, indent=4, default=str)
 
     print(f"[INFO] Config salvata in: {config_path}")
     # ──────────────────────────────────────────────────────────────────────────────
