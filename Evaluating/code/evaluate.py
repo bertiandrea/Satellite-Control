@@ -19,6 +19,8 @@ from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 
 import argparse
+import json
+import datetime
 
 REWARD_MAP = {
     "simple": SimpleReward,
@@ -52,6 +54,23 @@ def main():
         set_seed(CONFIG["seed"])
     
     #################################################################################
+
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 🔹 Salvataggio config + informazioni di run
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = "run_config"
+    os.makedirs(run_dir, exist_ok=True)
+    config_path = os.path.join(run_dir, f"evaluate_config_{args.run_name}_{timestamp}.json")
+
+    config_to_save = CONFIG.copy()
+    config_to_save["model_path"] = f"/home/andreaberti/Satellite-Control/Evaluating/{args.run_name}.pt"
+
+    with open(config_path, "w") as f:
+        json.dump(config_to_save, f, indent=4)
+
+    print(f"[INFO] Config di valutazione salvata in: {config_path}")
+    # ──────────────────────────────────────────────────────────────────────────
 
     print(CONFIG)
 
