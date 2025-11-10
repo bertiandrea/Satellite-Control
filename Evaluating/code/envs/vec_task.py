@@ -7,6 +7,7 @@ from isaacgym import gymtorch, gymapi
 import os
 import time
 import sys
+import random
 import numpy as np
 from datetime import datetime
 from os.path import join
@@ -172,6 +173,15 @@ class VecTask(Env):
 
     def step(self, actions: torch.Tensor) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
         with record_function("#VecTask__STEP"):
+            if self.randomize:
+                if self.debug_prints:
+                    print("Action BEFORE randomization:")
+                    print(f"actions[0]: {', '.join(f'{v:.2f}' for v in actions[0].tolist())}")
+                actions = self.dr_randomizations['actions']['noise_lambda'](actions)
+                if self.debug_prints:
+                    print("Action AFTER randomization:")
+                    print(f"actions[0]: {', '.join(f'{v:.2f}' for v in actions[0].tolist())}")
+            
             actions = torch.clamp(actions, -self.clip_actions, self.clip_actions)
             
             if self.debug_prints:
@@ -195,6 +205,15 @@ class VecTask(Env):
             with record_function("$VecTask__step__post_physics_step"):
                 self.post_physics_step()
 
+            if self.randomize:
+                if self.debug_prints:
+                    print("Observations BEFORE randomization:")
+                    print(f"obs_buf[0]: {', '.join(f'{v:.2f}' for v in self.obs_buf[0].tolist())}")
+                self.obs_buf = self.dr_randomizations['observations']['noise_lambda'](self.obs_buf)
+                if self.debug_prints:
+                    print("Observations AFTER randomization:")
+                    print(f"obs_buf[0]: {', '.join(f'{v:.2f}' for v in self.obs_buf[0].tolist())}")
+            
             self.obs_states_dict["obs"] = torch.clamp(self.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
             self.obs_states_dict["states"] = torch.clamp(self.states_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
             
@@ -310,3 +329,118 @@ class VecTask(Env):
                     setattr(sim_params.flex, opt, config_sim["flex"][opt])
 
         return sim_params
+    
+class DRVecTask(VecTask):
+    def __init__(self, config, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+        ###################################################
+        self.randomize = config["dr_randomization"].get("enabled", False)
+        self.dr_params = config["dr_randomization"].get("dr_params", {})
+        ###################################################
+        if self.randomize: 
+            self.first_randomization = True
+            self.original_props = {}
+            self.dr_randomizations = {}
+
+        super().__init__(config, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render)
+
+    def _sample_random_val(self, params):
+        if params["distribution"] == "gaussian":
+            mu, var = params["range"]
+            sample = np.random.normal(mu, var)
+        elif params["distribution"] == "uniform":
+            lo, hi = params["range"]
+            sample = np.random.uniform(lo, hi)
+        else:
+            raise ValueError(f"Unsupported distribution type")
+        return sample
+
+    def _apply_randomization(self, rb_prop, og_attr_val, attr_name, attr_params):
+        if isinstance(og_attr_val, gymapi.Mat33):
+            rx, ry, rz = og_attr_val.x, og_attr_val.y, og_attr_val.z
+            new_val = gymapi.Mat33()
+            if attr_params["operation"] == "scaling":
+                factor = self._sample_random_val(attr_params)
+                new_val.x.x, new_val.x.y, new_val.x.z = rx.x * factor, rx.y * factor, rx.z * factor
+                new_val.y.x, new_val.y.y, new_val.y.z = ry.x * factor, ry.y * factor, ry.z * factor
+                new_val.z.x, new_val.z.y, new_val.z.z = rz.x * factor, rz.y * factor, rz.z * factor
+            elif attr_params["operation"] == "addition":
+                delta = self._sample_random_val(attr_params)
+                new_val.x.x, new_val.x.y, new_val.x.z = rx.x + delta, rx.y + delta, rx.z + delta
+                new_val.y.x, new_val.y.y, new_val.y.z = ry.x + delta, ry.y + delta, ry.z + delta
+                new_val.z.x, new_val.z.y, new_val.z.z = rz.x + delta, rz.y + delta, rz.z + delta
+            else:
+                raise ValueError(f"Unsupported operation type")
+        else:
+            raise ValueError(f"Unsupported attribute type for randomization")
+        setattr(rb_prop, attr_name, new_val)
+
+    def _init_randomization_functions(self, dr_params):
+        for param in ["observations", "actions"]:
+            dist = dr_params[param]["distribution"]
+            operation = dr_params[param]["operation"]
+            if dist == 'gaussian':
+                mu, var = dr_params[param]["range"]
+                if operation == "scaling":
+                    def noise_lambda(tensor, param_name=param):
+                        return tensor * (torch.randn_like(tensor) * var + mu)
+                elif operation == "addition":
+                    def noise_lambda(tensor, param_name=param):
+                        return tensor + (torch.randn_like(tensor) * var + mu)
+                else:
+                    raise ValueError(f"Unsupported operation type")
+            elif dist == 'uniform':
+                lo, hi = dr_params[param]["range"]
+                if operation == "scaling":
+                    def noise_lambda(tensor):
+                        return tensor * (torch.rand_like(tensor) * (hi - lo) + lo)
+                elif operation == "addition":
+                    def noise_lambda(tensor):
+                        return tensor + (torch.rand_like(tensor) * (hi - lo) + lo)
+                else:
+                    raise ValueError(f"Unsupported operation type")
+            else:
+                raise ValueError(f"Unsupported distribution type")
+            ####################################################################
+            self.dr_randomizations[param] = { 'noise_lambda': noise_lambda }
+
+    def _randomize_actor_properties(self, env_ids, dr_params):
+        for env_id in env_ids:
+            for actor_name, actor_config  in dr_params["actor_params"].items():
+                actor_handle = self.gym.find_actor_handle(self.envs[env_id], actor_name)
+                if "color" in actor_config and actor_config ["color"]:
+                    num_bodies = self.gym.get_actor_rigid_body_count(self.envs[env_id], actor_handle)
+                    for body_index in range(num_bodies):
+                        self.gym.set_rigid_body_color(self.envs[env_id], actor_handle, body_index, gymapi.MESH_VISUAL, gymapi.Vec3(random.uniform(0, 1), random.uniform(0, 1), random.uniform(0, 1)))
+                if "rigid_body_properties" in actor_config:
+                    rb_props = self.gym.get_actor_rigid_body_properties(self.envs[env_id], actor_handle)
+                    ####################################################################
+                    if self.first_randomization:
+                        self.original_props[actor_name] = [rb.inertia for rb in rb_props]
+                    ####################################################################
+                    for i, rb_prop in enumerate(rb_props):
+                        if "inertia" in actor_config["rigid_body_properties"]:
+                            self._apply_randomization(rb_prop, self.original_props[actor_name][i], "inertia", actor_config["rigid_body_properties"]["inertia"])
+                    self.gym.set_actor_rigid_body_properties(
+                        self.envs[env_id], actor_handle, rb_props, recomputeInertia=True
+                    )
+                    
+    def apply_randomizations(self, env_ids, dr_params):
+        if self.first_randomization:
+            self._init_randomization_functions(dr_params)
+
+        self._randomize_actor_properties(env_ids, dr_params)
+
+        self.first_randomization = False
+
+        if self.debug_prints:
+            header = f"{'Env':<5} {'Ixx':>10} {'Iyy':>10} {'Izz':>10}"
+            print("=" * len(header))
+            print(header)
+            print("-" * len(header))
+            for env_id in env_ids:
+                env = self.envs[env_id]
+                actor_handle = self.actor_handles[env_id]
+                rb_props = self.gym.get_actor_rigid_body_properties(env, actor_handle)
+                I = rb_props[0].inertia
+                print(f"{env_id:<5} {I.x.x:>10.4f} {I.y.y:>10.4f} {I.z.z:>10.4f}")
+            print("=" * len(header) + "\n")

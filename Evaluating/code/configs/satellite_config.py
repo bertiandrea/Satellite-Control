@@ -21,7 +21,7 @@ MINI_BATCHES = 2
 
 CONFIG = {
     # --- seed & devices ----------------------------------------------------
-    "set_seed": True,
+    "set_seed": False,
     "seed": 42,
 
     "profile": False,
@@ -58,7 +58,7 @@ CONFIG = {
             "assetRoot": str(Path(__file__).resolve().parent.parent),
             "assetFileName": "satellite.urdf",
             "assetName": "satellite",
-        },
+        }
     },
 
     # --- sim section -------------------------------------------------------
@@ -71,7 +71,7 @@ CONFIG = {
 
         "physx": {
             "use_gpu": True,
-        },
+        }
     },
 
     # --- RL / PPO hyper-params --------------------------------------------
@@ -107,7 +107,7 @@ CONFIG = {
                 "checkpoint_interval": "auto",
                 "directory": "./runs",
                 "wandb": False,
-            },
+            }
         },
         "trainer": {
             "timesteps": int(MAX_EPISODE_LENGTH / ( 1.0 / 60.0 )),
@@ -117,13 +117,15 @@ CONFIG = {
         },
         "memory": {
             "rollouts": ROLLOUTS,
-        },
+        }
     },
+    
     # --- logging -----------------------------------------------------------
     "log_reward": {
         "log_reward": True,
         "log_reward_interval": 100,  # steps
     },
+
     # --- CAPS --------------------------------------------------------------
     "CAPS": {
         "enabled": False,
@@ -131,21 +133,39 @@ CONFIG = {
         "lambda_spatial_smoothness": 0.1,   # λ_s
         "noise_std": 0.5,                   # σ
     },
+
     # --- explosion ---------------------------------------------------------
     "explosion": {
         "enabled": False,
-        "explosion_time": 3,  # seconds
+        "explosion_time": 60,  # seconds
     },
-    # --- asteroid ----------------------------------------------------------
-    "asteroid": {
+
+    # --- dr_randomization -------------------------------------------------
+    "dr_randomization": {
         "enabled": False,
-        "object_mass": 0.0,  # kg
-        "object_mass_std": 0.0,  # kg
-        "object_mass_time": 120,  # seconds
-    },
-    # --- randomize masses --------------------------------------------------
-    "randomize_masses": {
-        "enabled": False,
-        "mass_std": 5,
+        "dr_params": {
+            "observations": {
+                "distribution": "uniform", # "uniform" or "gaussian"
+                "operation": "scaling", # "scaling" or "addition"
+                "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
+            },
+            "actions": {
+                "distribution": "uniform", # "uniform" or "gaussian"
+                "operation": "scaling", # "scaling" or "addition"
+                "range": [0.9, 1.1], # gaussian: [mu, var], uniform: [low, high]
+            },
+            "actor_params": {
+                "satellite": {
+                    "color": True,
+                    "rigid_body_properties": {
+                        "inertia": {
+                            "distribution": "uniform", # "uniform" or "gaussian"
+                            "operation": "scaling", # "scaling" or "addition"
+                            "range": [0.5, 1.5], # gaussian: [mu, var], uniform: [low, high]
+                        }
+                    }
+                }
+            }
+        }
     }
 }
