@@ -211,15 +211,15 @@ class PPOWrapperCAPS(PPO):
         self.track_data("CAPS / Lt", cumulative_Lt / total_batches)
         self.track_data("CAPS / Ls", cumulative_Ls / total_batches)
 
-        total_loss_components = (
-            abs(cumulative_policy_loss / (self._learning_epochs * self._mini_batches))
-            + abs(cumulative_value_loss / (self._learning_epochs * self._mini_batches))
-            + (abs(cumulative_entropy_loss / (self._learning_epochs * self._mini_batches)) if self._entropy_loss_scale else 0.0)
+        total_loss = (
+            (cumulative_policy_loss / (self._learning_epochs * self._mini_batches))
+            + (cumulative_value_loss / (self._learning_epochs * self._mini_batches))
+            + ((cumulative_entropy_loss / (self._learning_epochs * self._mini_batches)) if self._entropy_loss_scale else 0.0)
             + cumulative_Lt / total_batches
             + cumulative_Ls / total_batches
             + 1e-8
         )
         
-        self.track_data("CAPS / % Lt", 100.0 * cumulative_Lt / total_batches / total_loss_components)
-        self.track_data("CAPS / % Ls", 100.0 * cumulative_Ls / total_batches / total_loss_components)
+        self.track_data("CAPS / % Lt", 100.0 * cumulative_Lt / total_batches / total_loss)
+        self.track_data("CAPS / % Ls", 100.0 * cumulative_Ls / total_batches / total_loss)
         #####################################################################################

@@ -136,7 +136,7 @@ CONFIG = {
 
     # --- dr_randomization -------------------------------------------------
     "dr_randomization": {
-        "enabled": True,
+        "enabled": False,
         "dr_params": {
             "observations": {
                 "distribution": "uniform", # "uniform" or "gaussian"

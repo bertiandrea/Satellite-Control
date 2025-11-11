@@ -126,14 +126,6 @@ CONFIG = {
         "log_reward_interval": 100,  # steps
     },
 
-    # --- CAPS --------------------------------------------------------------
-    "CAPS": {
-        "enabled": False,
-        "lambda_temporal_smoothness": 0.1,  # λ_t
-        "lambda_spatial_smoothness": 0.1,   # λ_s
-        "noise_std": 0.5,                   # σ
-    },
-
     # --- explosion ---------------------------------------------------------
     "explosion": {
         "enabled": False,
