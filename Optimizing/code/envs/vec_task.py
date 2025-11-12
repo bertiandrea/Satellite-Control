@@ -15,18 +15,7 @@ from abc import ABC
 
 from gym import spaces
 
-EXISTING_SIM = None
 SCREEN_CAPTURE_RESOLUTION = (1027, 768)
-
-def _create_sim_once(gym, *args, **kwargs):
-    global EXISTING_SIM
-    if EXISTING_SIM is not None:
-        print("Using EXISTING Sim Instance")
-        return EXISTING_SIM
-    else:
-        print("Creating NEW Sim Instance")
-        EXISTING_SIM = gym.create_sim(*args, **kwargs)
-        return EXISTING_SIM
 
 
 class Env(ABC):
@@ -108,8 +97,6 @@ class VecTask(Env):
         torch._C._jit_set_profiling_mode(False)
         torch._C._jit_set_profiling_executor(False)
 
-        self.gym = gymapi.acquire_gym()
-
         self.sim_initialized = False
         self.create_sim()
         self.gym.prepare_sim(self.sim)
@@ -159,14 +146,6 @@ class VecTask(Env):
         self.progress_buf = torch.zeros(
             self.num_envs, device=self.device, dtype=torch.long)
         self.extras = {}
-
-    def create_sim(self, compute_device: int, graphics_device: int, physics_engine, sim_params: gymapi.SimParams):
-        sim = _create_sim_once(self.gym, compute_device, graphics_device, physics_engine, sim_params)
-        if sim is None:
-            print("*** Failed to create sim")
-            quit()
-
-        return sim
 
     def step(self, actions: torch.Tensor) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
         actions = torch.clamp(actions, -self.clip_actions, self.clip_actions)

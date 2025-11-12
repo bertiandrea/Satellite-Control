@@ -19,7 +19,8 @@ class Satellite(VecTask):
 
 
     def create_sim(self) -> None:
-        self.sim = super().create_sim(self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params) # Acquires the sim pointer
+        self.gym = gymapi.acquire_gym()
+        self.sim = self.gym.create_sim(self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params) 
         self.create_envs(self.env_spacing, int(np.sqrt(self.num_envs)))
 
     def create_envs(self, spacing, num_per_row: int) -> None:
