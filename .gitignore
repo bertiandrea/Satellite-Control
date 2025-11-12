@@ -2,3 +2,4 @@
 **/__pycache__/*.pyc
 **/runs/
 **/logs/
+**/optuna_study.db
