@@ -15,9 +15,6 @@ from abc import ABC
 
 from gym import spaces
 
-from torch.profiler import record_function
-from torch.utils.tensorboard import SummaryWriter
-
 EXISTING_SIM = None
 SCREEN_CAPTURE_RESOLUTION = (1027, 768)
 
@@ -81,8 +78,6 @@ class Env(ABC):
 
         self.record_frames: bool = False
         self.record_frames_dir = join("recorded_frames", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-
-        self.writer = SummaryWriter(comment="_satellite")
 
 class VecTask(Env):
 
@@ -167,8 +162,6 @@ class VecTask(Env):
 
     def create_sim(self, compute_device: int, graphics_device: int, physics_engine, sim_params: gymapi.SimParams):
         sim = _create_sim_once(self.gym, compute_device, graphics_device, physics_engine, sim_params)
-        # WORKAROUND: BugFix for IsaacGym not handling multiple Gym instances correctly in the same process (Needed for Hyperparameter Optimization)
-        # sim = self.gym.create_sim(compute_device, graphics_device, physics_engine, sim_params)
         if sim is None:
             print("*** Failed to create sim")
             quit()
@@ -176,56 +169,25 @@ class VecTask(Env):
         return sim
 
     def step(self, actions: torch.Tensor) -> Tuple[Dict[str, torch.Tensor], torch.Tensor, torch.Tensor, Dict[str, Any]]:
-        with record_function("#VecTask__STEP"):
-            actions = torch.clamp(actions, -self.clip_actions, self.clip_actions)
-            
-            if self.debug_prints:
-                print("#" * 50)
-                print(f"Actions         MAX: {actions.max().item():.2f} MIN: {actions.min().item():.2f} MEAN: {actions.mean().item():.2f} STD: {actions.std().item():.2f}")  # Debugging output
+        actions = torch.clamp(actions, -self.clip_actions, self.clip_actions)
+        
+        self.pre_physics_step(actions)
 
-            with record_function("$VecTask__step__pre_physics_step"):
-                self.pre_physics_step(actions)
+        for i in range(self.control_freq_inv):
+            if self.force_render:
+                self.render()
+            self.gym.simulate(self.sim)
 
-            for i in range(self.control_freq_inv):
-                if self.force_render:
-                    with record_function("#VecTask__step__RENDER"):
-                        self.render()
-                with record_function("#VecTask__step__SIM"):
-                    self.gym.simulate(self.sim)
+        if self.device == 'cpu':
+            self.gym.fetch_results(self.sim, True)
 
-            if self.device == 'cpu':
-                with record_function("$VecTask__step__FETCH_RESULTS"):
-                    self.gym.fetch_results(self.sim, True)
+        self.post_physics_step()
 
-            with record_function("$VecTask__step__post_physics_step"):
-                self.post_physics_step()
-
-            self.obs_states_dict["obs"] = torch.clamp(self.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
-            self.obs_states_dict["states"] = torch.clamp(self.states_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
-            
-            self.control_steps += 1
-            self.extras["time_outs"] = self.timeout_buf.to(self.rl_device)
-
-            if self.debug_prints:
-                num_quats = 4; num_quat_diff = 4; num_quat_diff_rad = 1; num_angacc = 3; num_actions = 3; num_angvels = 3
-                l_index = 0; h_index = num_quats
-                print(f"Quats           MAX: {self.obs_states_dict['states'][:, l_index:h_index].max().item():.2f} MIN: {self.obs_states_dict['states'][:, l_index:h_index].min().item():.2f} MEAN: {self.obs_states_dict['states'][:, l_index:h_index].mean().item():.2f} STD: {self.obs_states_dict['states'][:, l_index:h_index].std().item():.2f}")  # Debugging output
-                l_index = num_quats; h_index = num_quats + num_quat_diff
-                print(f"QuatsDiff       MAX: {self.obs_states_dict['states'][:, l_index:h_index].max().item():.2f} MIN: {self.obs_states_dict['states'][:, l_index:h_index].min().item():.2f} MEAN: {self.obs_states_dict['states'][:, l_index:h_index].mean().item():.2f} STD: {self.obs_states_dict['states'][:, l_index:h_index].std().item():.2f}")  # Debugging output
-                l_index = num_quats + num_quat_diff; h_index = num_quats + num_quat_diff + num_quat_diff_rad
-                print(f"QuatsDiffRad    MAX: {self.obs_states_dict['states'][:, l_index:h_index].max().item():.2f} MIN: {self.obs_states_dict['states'][:, l_index:h_index].min().item():.2f} MEAN: {self.obs_states_dict['states'][:, l_index:h_index].mean().item():.2f} STD: {self.obs_states_dict['states'][:, l_index:h_index].std().item():.2f}")  # Debugging output
-                l_index = num_quats + num_quat_diff + num_quat_diff_rad; h_index = num_quats + num_quat_diff + num_quat_diff_rad + num_angacc
-                print(f"AngAcc          MAX: {self.obs_states_dict['states'][:, l_index:h_index].max().item():.2f} MIN: {self.obs_states_dict['states'][:, l_index:h_index].min().item():.2f} MEAN: {self.obs_states_dict['states'][:, l_index:h_index].mean().item():.2f} STD: {self.obs_states_dict['states'][:, l_index:h_index].std().item():.2f}")  # Debugging output
-                l_index = num_quats + num_quat_diff + num_quat_diff_rad + num_angacc; h_index = num_quats + num_quat_diff + num_quat_diff_rad + num_angacc + num_actions
-                print(f"Act             MAX: {self.obs_states_dict['states'][:, l_index:h_index].max().item():.2f} MIN: {self.obs_states_dict['states'][:, l_index:h_index].min().item():.2f} MEAN: {self.obs_states_dict['states'][:, l_index:h_index].mean().item():.2f} STD: {self.obs_states_dict['states'][:, l_index:h_index].std().item():.2f}")  # Debugging output
-                l_index = num_quats + num_quat_diff + num_quat_diff_rad + num_angacc + num_actions; h_index = num_quats + num_quat_diff + num_quat_diff_rad + num_angacc + num_actions + num_angvels
-                print(f"AngVels         MAX: {self.obs_states_dict['states'][:, l_index:h_index].max().item():.2f} MIN: {self.obs_states_dict['states'][:, l_index:h_index].min().item():.2f} MEAN: {self.obs_states_dict['states'][:, l_index:h_index].mean().item():.2f} STD: {self.obs_states_dict['states'][:, l_index:h_index].std().item():.2f}")  # Debugging output
-                print(f"Reward          MAX: {self.rew_buf.max().item():.2f} MIN: {self.rew_buf.min().item():.2f} MEAN: {self.rew_buf.mean().item():.2f} STD: {self.rew_buf.std().item():.2f}")  # Debugging output
-
-                print(f"Timeouts:       {self.timeout_buf.sum().item()}")  # Debugging output
-                print(f"Reset:          {self.reset_buf.sum().item()}")  # Debugging output
-                print(f"Extras:         {self.extras}")  # Debugging output
-                print(f"Steps:          {self.control_steps}")  # Debugging output
+        self.obs_states_dict["obs"] = torch.clamp(self.obs_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
+        self.obs_states_dict["states"] = torch.clamp(self.states_buf, -self.clip_obs, self.clip_obs).to(self.rl_device)
+        
+        self.control_steps += 1
+        self.extras["time_outs"] = self.timeout_buf.to(self.rl_device)
 
         return self.obs_states_dict, self.rew_buf.to(self.rl_device), self.reset_buf.to(self.rl_device), self.extras
 
@@ -320,19 +282,24 @@ class VecTask(Env):
         print("Closing VecTask environment...")
         for env in self.envs:
             self.gym.destroy_env(env)
-        
+            del env
+        del self.envs
         print(f"Destroyed environments: {len(self.envs)}")
         
         if self.viewer is not None:
             self.gym.destroy_viewer(self.viewer)
             print("Destroyed viewer")
             self.viewer = None
+            del self.viewer
 
         self.gym.destroy_sim(self.sim)
         self.sim = None
+        del self.sim
         print("Destroyed simulation")
 
+        del self.gym
         del self.states_buf, self.obs_buf, self.rew_buf, self.reset_buf, self.progress_buf, self.timeout_buf
+        torch.cuda.synchronize()
         torch.cuda.empty_cache()  # Empty GPU cache
 
         global EXISTING_SIM

@@ -2,7 +2,6 @@
 
 DISPLAY_NUM=${1:-99}            # Numero del display, default 99
 CONDA_ENV=${2:-rlgpu}           # Nome dell'ambiente Conda, default "rlgpu"
-REWARD_FN=${3:-simple}            # Reward function da passare, default "simple"
 SCREEN_RES="1920x1080x24"
 
 export DISPLAY=:$DISPLAY_NUM
@@ -63,6 +62,6 @@ else
     exit 1
 fi
 
-python -m code.optimize --reward-fn "$REWARD_FN"
+python -m code.optimize
 
 exit 0

@@ -1,30 +1,18 @@
 # satellite_config.py
 
 from pathlib import Path
-import numpy as np
-
-import isaacgym
-import torch
-
-from skrl.resources.preprocessors.torch import RunningStandardScaler
-from skrl.resources.schedulers.torch import KLAdaptiveRL
 
 NUM_ENVS = 4096
 N_EPOCHS = 8
 TIMESTEPS = 120
 HEADLESS = True
-DEBUG_ARROWS = False
 
 ROLLOUTS = 16
-LEARNING_EPOCHS = 8
-MINI_BATCHES = 2
 
 CONFIG = {
     # --- seed & devices ----------------------------------------------------
     "set_seed": True,
     "seed": 42,
-
-    "profile": False,
 
     "physics_engine": "physx",
 
@@ -44,12 +32,7 @@ CONFIG = {
         "clipActions": 1.0,
         "clipObservations": 10.0,
 
-        "max_episode_length": 1000.0,
-
         "envSpacing": 3.0,
-        "torque_scale": 200.0,
-        "debug_arrows": DEBUG_ARROWS,
-        "debug_prints": False,
         
         "asset": {
             "assetRoot": str(Path(__file__).resolve().parent.parent),
@@ -73,27 +56,7 @@ CONFIG = {
 
     # --- RL / PPO hyper-params --------------------------------------------
     "rl": {
-        "PPO": {
-            "num_envs": NUM_ENVS,
-            
-            "learning_rate_scheduler" : KLAdaptiveRL,
-            "learning_rate_scheduler_kwargs" : {"kl_threshold": 0.01},
-            "state_preprocessor" : RunningStandardScaler,
-            "value_preprocessor" : RunningStandardScaler,
-            "rewards_shaper" : None,
-
-            "kl_threshold" : 0, #Optional early-stop threshold on KL divergence between old and new policies (0 disables).
-
-            "random_timesteps" : 0, #Number of initial timesteps with random actions before learning or policy-driven sampling.
-            "learning_starts" : 0, #Number of environment steps to collect before beginning any gradient updates.
-            
-            "experiment": {
-                "write_interval": "auto",
-                "checkpoint_interval": "auto",
-                "directory": "./runs",
-                "wandb": False,
-            },
-        },
+        "PPO": {},
         "trainer": {
             "n_epochs": N_EPOCHS,
             "timesteps": TIMESTEPS,
@@ -103,10 +66,5 @@ CONFIG = {
         "memory": {
             "rollouts": ROLLOUTS,
         },
-    },
-    # --- logging -----------------------------------------------------------
-    "log_reward": {
-        "log_reward": True,
-        "log_reward_interval": 100,  # steps
     },
 }

@@ -25,6 +25,80 @@ from optuna.samplers import TPESampler
 TENSORBOARD_TAG = "Reward / Instantaneous reward (mean)"
 N_TRIALS = 1000
 # ──────────────────────────────────────────────────────────────────────────────
+import subprocess
+import time
+import socket
+N_JOBS = 4  # Numero di processi paralleli locali
+# Database PostgreSQL
+POSTGRES_USER = "optuna_user"
+POSTGRES_PASSWORD = "password"
+POSTGRES_DB = "optuna_db"
+POSTGRES_HOST = "localhost"
+POSTGRES_PORT = 5432
+STORAGE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+# ────────────── gestione automatica PostgreSQL ──────────────
+POSTGRES_CONTAINER = "optuna_postgres"
+POSTGRES_VOLUME = "optuna_data"
+
+def is_postgres_running(host, port):
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            return True
+    except (ConnectionRefusedError, OSError):
+        return False
+
+def start_postgres_container():
+    print("Controllo se PostgreSQL è già in esecuzione...")
+    if is_postgres_running(POSTGRES_HOST, POSTGRES_PORT):
+        print("✅ PostgreSQL già attivo.")
+        return
+
+    # Creazione volume persistente se non esiste
+    existing_volume = subprocess.run(
+        ["docker", "volume", "ls", "--format", "{{.Name}}"],
+        capture_output=True, text=True
+    ).stdout.splitlines()
+    if POSTGRES_VOLUME not in existing_volume:
+        subprocess.run(["docker", "volume", "create", POSTGRES_VOLUME], check=True)
+        print(f"✅ Volume Docker '{POSTGRES_VOLUME}' creato.")
+
+    # Controllo se container esiste
+    existing_container = subprocess.run(
+        ["docker", "ps", "-a", "--filter", f"name={POSTGRES_CONTAINER}", "--format", "{{.Names}}"],
+        capture_output=True, text=True
+    ).stdout.strip()
+
+    if existing_container != POSTGRES_CONTAINER:
+        print("Avvio nuovo container PostgreSQL...")
+        subprocess.run([
+            "docker", "run", "-d",
+            "--name", POSTGRES_CONTAINER,
+            "-e", f"POSTGRES_USER={POSTGRES_USER}",
+            "-e", f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
+            "-e", f"POSTGRES_DB={POSTGRES_DB}",
+            "-v", f"{POSTGRES_VOLUME}:/var/lib/postgresql/data",
+            "-p", f"{POSTGRES_PORT}:5432",
+            "postgres:15"
+        ], check=True)
+    else:
+        print("Container esistente trovato, avvio...")
+        subprocess.run(["docker", "start", POSTGRES_CONTAINER], check=True)
+
+    # Attendo che il DB sia pronto
+    print("Attendo avvio PostgreSQL...")
+    for _ in range(30):
+        if is_postgres_running(POSTGRES_HOST, POSTGRES_PORT):
+            print("✅ PostgreSQL pronto.")
+            return
+        time.sleep(1)
+    raise RuntimeError("❌ PostgreSQL non si è avviato in tempo.")
+
+def stop_postgres_container():
+    """Spegnimento opzionale del container PostgreSQL."""
+    print(f"Spegnimento container PostgreSQL '{POSTGRES_CONTAINER}'...")
+    subprocess.run(["docker", "stop", POSTGRES_CONTAINER], check=False)
+
+# ──────────────────────────────────────────────────────────────────────────────
 
 def sample_ppo_params(trial: optuna.Trial):
     return {
@@ -34,7 +108,7 @@ def sample_ppo_params(trial: optuna.Trial):
 def print_memory_usage(tag=""):
     pid = os.getpid()
     process = psutil.Process(pid)
-    cpu_mem = process.memory_info().rss / 1024**2  # in MB
+    cpu_mem = process.memory_info().rss / 1024**2  # MB
     print(f"\n[MEMORY] {tag}")
     print(f"  CPU RSS: {cpu_mem:.2f} MB")
     mem_alloc = torch.cuda.memory_allocated() / 1024**2
@@ -43,7 +117,7 @@ def print_memory_usage(tag=""):
     print("#" * len(f"[MEMORY] {tag}"))
 
 def objective(trial: optuna.Trial) -> float:
-    print_memory_usage("#### BEFORE TRIAL START ####")  # Monitor memory before trial
+    print_memory_usage("#### BEFORE TRIAL START ####")
 
     env = Satellite(
         cfg=CONFIG,
@@ -52,9 +126,8 @@ def objective(trial: optuna.Trial) -> float:
         graphics_device_id=CONFIG["graphics_device_id"],
         headless=CONFIG["headless"],
         virtual_screen_capture=CONFIG["virtual_screen_capture"],
-        force_render= CONFIG["force_render"],
+        force_render=CONFIG["force_render"],
     )
-    
     env = IsaacGymWrapper(env)
 
     memory = RandomMemory(memory_size=CONFIG["rl"]["memory"]["rollouts"], num_envs=env.num_envs, device=env.device)
@@ -75,7 +148,7 @@ def objective(trial: optuna.Trial) -> float:
             device=env.device)
     
     trainer = Trainer(cfg=CONFIG["rl"]["trainer"], env=env, agent=agent)
-    
+
     try:
         best_mean_return = -float("inf")
         states, infos = trainer.init_step_train()
@@ -88,15 +161,14 @@ def objective(trial: optuna.Trial) -> float:
             trial.report(mean_return, step=epoch)
             if trial.should_prune():
                 print(f"Trial {trial.number} pruned at epoch {epoch+1}")
-                raise optuna.exceptions.TrialPruned() 
+                raise optuna.exceptions.TrialPruned()
     finally:
         print("Closing environment and freeing memory...")
-        env.close() # Force environment close to avoid memory leaks
-        print_memory_usage("#### AFTER CLOSE ENV TRIAL END ####")  # Monitor memory after trial
-        del env, memory, models, agent, trainer # Delete objects to free memory
+        env.close()
+        del env, memory, models, agent, trainer
         torch.cuda.synchronize()
-        torch.cuda.empty_cache()  # Empty GPU cache
-        gc.collect()  # Manual garbage collection
+        torch.cuda.empty_cache()
+        gc.collect()
         print_memory_usage("#### AFTER GC ####")
 
     return best_mean_return
@@ -104,21 +176,22 @@ def objective(trial: optuna.Trial) -> float:
 def main():
     study = optuna.create_study(
         study_name=f"Satellite_{datetime.now():%Y%m%d_%H%M%S}",
-        storage="sqlite:///optuna_study.db",
-        sampler=TPESampler(n_startup_trials=10, multivariate=True),
-        pruner=MedianPruner(n_startup_trials=10, n_warmup_steps=1),
-        direction="maximize",
+        storage=STORAGE_URL,
+        load_if_exists=True,
+        sampler=TPESampler(n_startup_trials=0, multivariate=True),
+        pruner=MedianPruner(n_startup_trials=0, n_warmup_steps=0),
+        direction="maximize"
     )
+
     try:
-        study.optimize(objective, n_trials=N_TRIALS, gc_after_trial=True, 
+        study.optimize(objective, n_trials=N_TRIALS, n_jobs=N_JOBS, gc_after_trial=True,
                        callbacks=[lambda study, trial: gc.collect()])
     except KeyboardInterrupt:
         pass
 
-    ##################################################################
-
+    # Salvataggio parametri ottimali
     log_dir = "/home/andreaberti"
-    out_path = log_dir + "/optimizer_results/satellite/best_hyperparams.json"
+    out_path = os.path.join(log_dir, "optimizer_results/satellite/best_hyperparams.json")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(study.best_params, f, indent=2)
@@ -128,6 +201,10 @@ def main():
     print(f"➤ mean_return migliore: {study.best_value:.3f}")
     for k, v in study.best_params.items():
         print(f"   {k}: {v}")
-    
+
 if __name__ == "__main__":
-    main()
+    start_postgres_container()
+    try:
+        main()
+    finally:
+        stop_postgres_container()
