@@ -283,25 +283,18 @@ class VecTask(Env):
         for env in self.envs:
             self.gym.destroy_env(env)
             del env
-        del self.envs
         print(f"Destroyed environments: {len(self.envs)}")
         
         if self.viewer is not None:
             self.gym.destroy_viewer(self.viewer)
             print("Destroyed viewer")
-            self.viewer = None
             del self.viewer
 
         self.gym.destroy_sim(self.sim)
-        self.sim = None
-        del self.sim
         print("Destroyed simulation")
 
-        del self.gym
+        del self.gym, self.envs, self.sim, self.sim_params
         del self.states_buf, self.obs_buf, self.rew_buf, self.reset_buf, self.progress_buf, self.timeout_buf
-        torch.cuda.synchronize()
         torch.cuda.empty_cache()  # Empty GPU cache
 
-        global EXISTING_SIM
-        EXISTING_SIM = None
 

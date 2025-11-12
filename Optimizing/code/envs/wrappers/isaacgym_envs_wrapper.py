@@ -60,6 +60,5 @@ class IsaacGymWrapper(Wrapper):
     def close(self) -> None:
         print("Closing Wrapper environment...")
         del self._observations, self._states, self._info
-        torch.cuda.synchronize()
         torch.cuda.empty_cache()
         self._env.close()

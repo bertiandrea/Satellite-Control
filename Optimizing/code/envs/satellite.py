@@ -58,6 +58,5 @@ class Satellite(VecTask):
     def close(self):
         print("Closing Satellite environment...")
         del self.env_spacing, self.asset_name, self.asset_root, self.asset_file, self.asset
-        torch.cuda.synchronize()
         torch.cuda.empty_cache()  # Empty GPU cache
         super().close()

@@ -166,9 +166,9 @@ def objective(trial: optuna.Trial) -> float:
         print("Closing environment and freeing memory...")
         env.close()
         del env, memory, models, agent, trainer
+        gc.collect()
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
-        gc.collect()
         print_memory_usage("#### AFTER GC ####")
 
     return best_mean_return

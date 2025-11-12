@@ -94,9 +94,9 @@ def objective(trial: optuna.Trial) -> float:
         env.close() # Force environment close to avoid memory leaks
         print_memory_usage("#### AFTER CLOSE ENV TRIAL END ####")  # Monitor memory after trial
         del env, memory, models, agent, trainer # Delete objects to free memory
+        gc.collect()  # Manual garbage collection
         torch.cuda.synchronize()
         torch.cuda.empty_cache()  # Empty GPU cache
-        gc.collect()  # Manual garbage collection
         print_memory_usage("#### AFTER GC ####")
 
     return best_mean_return
